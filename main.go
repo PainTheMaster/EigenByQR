@@ -1,76 +1,82 @@
 package main
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 func main() {
 
+	A := [][]float64{
+		{1, 1, 1},
+		{1, 2, 4},
+		{1, 3, 6}}
+
+	y := []float64{3, 7, 10}
+
+	Qt, R := qr(A)
+
+	x := solver(Qt, R, y)
+
+	fmt.Println("R:\n", R)
+
+	fmt.Println()
+	fmt.Println("x:\n", x)
 }
 
-func qr(A [][]float64, rep int) (Qt [][]float64, R [][]float64) {
+func qr(A [][]float64) (Qt [][]float64, R [][]float64) {
 
 	size := len(A)
 
 	Qt = make([][]float64, size-1)
-	for i := 0; i <= size-1; i++ {
-		Qt[i] = make([]float64, size-i)
-	}
 
 	R = make([][]float64, size)
 	for i := 0; i <= size-1; i++ {
 		R[i] = make([]float64, size)
 	}
-
-	{
-		colPiv := 0
-		tempH, topVal := householder(A, colPiv)
-		for row := 0; row <= size-colPiv; row++ {
-			Qt[colPiv][row] = tempH[row]
-		}
-
-		R[colPiv][colPiv] = topVal
-
-		vecTemp := make([]float64, size-colPiv)
-		for colProd := colPiv + 1; colProd <= size-1; colProd++ {
-			innerprod := 0.0
-			for i := colPiv; i <= size-1; i++ {
-				innerprod += tempH[i-colPiv] * A[i][colProd]
-			}
-
-			for rowProd := colPiv; rowProd <= size-1; rowProd++ {
-				vecTemp[rowProd-colPiv] = A[rowProd][colProd] - 2.0*tempH[rowProd-colPiv]*innerprod
-			}
-			for rowCopy := colPiv; rowCopy <= size-1; rowCopy++ {
-				R[rowCopy][colProd] = vecTemp[rowCopy-colPiv]
-			}
+	for i := 0; i <= size-1; i++ {
+		for j := 0; j <= size-1; j++ {
+			R[i][j] = A[i][j]
 		}
 	}
 
-	for colPiv := 1; colPiv <= size-2; colPiv++ {
-		tempH, topVal := householder(A, colPiv)
-		for row := 0; row <= size-colPiv; row++ {
+	for colPiv := 0; colPiv <= size-2; colPiv++ {
+		tempH, topVal := householder(R, colPiv)
+
+		Qt[colPiv] = make([]float64, size-colPiv)
+		for row := 0; row <= size-colPiv-1; row++ {
 			Qt[colPiv][row] = tempH[row]
 		}
 
 		R[colPiv][colPiv] = topVal
-
-		vecTemp := make([]float64, size-colPiv)
-		for colProd := colPiv + 1; colProd <= size-1; colProd++ {
-			innerprod := 0.0
-			for i := colPiv; i <= size-1; i++ {
-				innerprod += tempH[i-colPiv] * R[i][colProd]
-			}
-
-			for rowProd := colPiv; rowProd <= size-1; rowProd++ {
-				vecTemp[rowProd-colPiv] = R[rowProd][colProd] - 2.0*tempH[rowProd-colPiv]*innerprod
-			}
-			for rowCopy := colPiv; rowCopy <= size-1; rowCopy++ {
-				R[rowCopy][colProd] = vecTemp[rowCopy-colPiv]
-			}
+		for i := colPiv + 1; i <= size-1; i++ {
+			R[i][colPiv] = 0.0
 		}
+
+		for colProduct := colPiv + 1; colProduct <= size-1; colProduct++ {
+			helperMultiplyQrVertical(R, colProduct, tempH)
+		}
+
 	}
 
 	return
+}
 
+func helperMultiplyQrVertical(R [][]float64, col int, v []float64) {
+	sizeMat := len(R)
+	sizeVec := len(v)
+
+	var innerprod float64
+	rowTop := sizeMat - sizeVec
+
+	innerprod = 0.0
+	for i := 0; i <= sizeVec-1; i++ {
+		innerprod += R[rowTop+i][col] * v[i]
+	}
+
+	for i := 0; i <= sizeVec-1; i++ {
+		R[rowTop+i][col] = R[rowTop+i][col] - 2.0*v[i]*innerprod
+	}
 }
 
 //Gives Householder "vector" of A focusing on the column c "col" and topVal
@@ -91,10 +97,10 @@ func householder(A [][]float64, col int) (h []float64, topVal float64) {
 
 	h = make([]float64, size-col)
 
-	h[0] = A[0][col] - topVal
+	h[0] = A[col][col] - topVal
 
 	for i := 1; i <= size-col-1; i++ {
-		h[i] = A[i][col]
+		h[i] = A[col+i][col]
 	}
 
 	tempSqNormH -= A[col][col] * A[col][col]
@@ -103,7 +109,35 @@ func householder(A [][]float64, col int) (h []float64, topVal float64) {
 	normalizFactor := 1.0 / math.Sqrt(tempSqNormH)
 
 	for i := 0; i <= size-col-1; i++ {
-		h[i] /= normalizFactor
+		h[i] *= normalizFactor
+	}
+
+	return
+}
+
+func solver(Qt [][]float64, R [][]float64, y []float64) (x []float64) {
+
+	size := len(R)
+
+	for idxQ := 0; idxQ <= size-2; idxQ++ {
+		innerProd := 0.0
+		for i := 0; i+idxQ <= size-1; i++ {
+			innerProd += Qt[idxQ][i] * y[idxQ+i]
+		}
+
+		for i := 0; i+idxQ <= size-1; i++ {
+			y[idxQ+i] = y[idxQ+i] - 2.0*Qt[idxQ][i]*innerProd
+		}
+	}
+
+	x = make([]float64, size)
+
+	for rowSolv := size - 1; rowSolv >= 0; rowSolv-- {
+		var sum float64
+		for i := size - 1; i >= rowSolv+1; i-- {
+			sum += R[rowSolv][i] * x[i]
+		}
+		x[rowSolv] = (y[rowSolv] - sum) / R[rowSolv][rowSolv]
 	}
 
 	return
