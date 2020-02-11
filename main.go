@@ -8,11 +8,12 @@ import (
 func main() {
 
 	A := [][]float64{
-		{-16.0, -1.0, 1.0},
-		{2.0, 12.0, 1.0},
-		{1.0, 3.0, -24.0}}
+		{16, -1, 1, 2},
+		{2, 12, 1, -1},
+		{1, 3, -24, 2},
+		{4, -2, 1, 20}}
 
-	_ = eigenByQR(A, 5)
+	_ = eigenByQR(A, 1000)
 
 	/*	x := solver(Qt, R, y)
 
@@ -33,9 +34,13 @@ func eigenByQR(A [][]float64, rep int) (R [][]float64) {
 	fmt.Println("A:\n", A)
 	fmt.Println("R:\n", R)
 
+	var Qt [][]float64
+
 	for i := 1; i <= rep; i++ {
 		/*まずQt,Rを求める*/
-		Qt, R := qr(R)
+		fmt.Println("pre-qr R:\n", R)
+
+		Qt, R = qr(R) /*宣言同時代入(:=)してはいけない。そうしてしまう右辺と左辺のRが別々のシンボルとなり、毎回Rの初期値から初めてしまうようだ!*/
 
 		/* Qを順に掛けていく */
 		lenQt := len(Qt)
