@@ -8,20 +8,64 @@ import (
 func main() {
 
 	A := [][]float64{
-		{1, 1, 1},
-		{1, 2, 4},
-		{1, 3, 6}}
+		{-16.0, -1.0, 1.0},
+		{2.0, 12.0, 1.0},
+		{1.0, 3.0, -24.0}}
 
-	y := []float64{3, 7, 10}
+	_ = eigenByQR(A, 5)
 
-	Qt, R := qr(A)
+	/*	x := solver(Qt, R, y)
 
-	x := solver(Qt, R, y)
+		fmt.Println("x:\n", x)*/
+}
 
+func eigenByQR(A [][]float64, rep int) (R [][]float64) {
+	size := len(A)
+
+	R = make([][]float64, size)
+	for i := 0; i <= size-1; i++ {
+		R[i] = make([]float64, size)
+		for j := 0; j <= size-1; j++ {
+			R[i][j] = A[i][j]
+		}
+	}
+
+	fmt.Println("A:\n", A)
 	fmt.Println("R:\n", R)
 
-	fmt.Println()
-	fmt.Println("x:\n", x)
+	for i := 1; i <= rep; i++ {
+		/*まずQt,Rを求める*/
+		Qt, R := qr(R)
+
+		/* Qを順に掛けていく */
+		lenQt := len(Qt)
+		for idxQt := 0; idxQt <= lenQt-1; idxQt++ {
+			for row := 0; row <= size-1; row++ {
+				helperMultiplyEigenHorizon(R, row, Qt[idxQt])
+			}
+		}
+
+		fmt.Println(i, ", R:\n", R)
+	}
+
+	return
+}
+
+func helperMultiplyEigenHorizon(R [][]float64, row int, vt []float64) {
+
+	sizeMat := len(R)
+	sizeVec := len(vt)
+
+	var innerprod float64
+
+	innerprod = 0.0
+	for j := 0; j <= sizeVec-1; j++ {
+		innerprod += R[row][sizeMat-sizeVec+j] * vt[j]
+	}
+
+	for j := 0; j <= sizeVec-1; j++ {
+		R[row][sizeMat-sizeVec+j] = R[row][sizeMat-sizeVec+j] - 2.0*vt[j]*innerprod
+	}
 }
 
 func qr(A [][]float64) (Qt [][]float64, R [][]float64) {
