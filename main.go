@@ -192,3 +192,33 @@ func solver(Qt [][]float64, R [][]float64, y []float64) (x []float64) {
 	return
 
 }
+
+func lu(A [][]float64) (LU [][]float64) {
+	size := len(A)
+
+	LU = make([][]float64, size)
+	for i := 0; i <= size-1; i++ {
+		LU[i] = make([]float64, size)
+	}
+
+	for col := 0; col <= size-1; col++ {
+		for row := 0; row <= col-1; row++ {
+			var innerprod float64
+			for i := 0; i <= row-1; i++ {
+				innerprod += LU[row][i] * LU[i][col]
+			}
+			LU[row][col] = (A[row][col] - innerprod) / LU[row][row]
+		}
+
+		for row := col; row <= size-1; row++ {
+			var innerprod float64
+			for i := 0; i <= row-1; i++ {
+				innerprod += LU[row][i] * LU[i][col]
+			}
+			LU[row][col] = A[row][col] - innerprod
+		}
+	}
+
+	return
+
+}
