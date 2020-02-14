@@ -12,12 +12,15 @@ func main() {
 		{2, 12, 1, -1},
 		{1, 3, -24, 2},
 		{4, -2, 1, 20}}
-
-	_ = eigenByQR(A, 1000)
-
+	/*
+		_ = eigenByQR(A, 1000)
+	*/
 	/*	x := solver(Qt, R, y)
 
 		fmt.Println("x:\n", x)*/
+
+	LU := lu(A)
+	fmt.Println("LU:\n", LU)
 }
 
 func eigenByQR(A [][]float64, rep int) (R [][]float64) {
@@ -220,5 +223,39 @@ func lu(A [][]float64) (LU [][]float64) {
 	}
 
 	return
+}
 
+func luInverse(LU [][]float64) (LUinv [][]float64) {
+
+	size := len(LU)
+
+	LUinv = make([][]float64, size)
+	for i := 0; i <= size-1; i++ {
+		LUinv[i] = make([]float64, size)
+	}
+
+	for col := size - 1; col >= 0; col-- {
+		for row := col - 1; row >= 0; row-- {
+			var innerprod float64
+			for i := row + 1; i <= col-1; i++ {
+				innerprod += LU[row][i] * LUinv[i][col]
+			}
+			innerprod += LU[row][col] * 1.0
+			LUinv[row][col] = -1.0 * innerprod
+		}
+	}
+
+	for row := size - 1; row >= 0; row-- {
+		col := row
+		LUinv[row][row] = 1.0 / LU[row][row]
+		col--
+		for ; col >= 0; col-- {
+			var innerprod float64
+			for i := col + 1; i <= row; i++ {
+				innerprod += LUinv[row][i] * LU[i][col]
+			}
+			LUinv[row][col] = -1.0 * innerprod / LU[col][col]
+		}
+	}
+	return
 }
