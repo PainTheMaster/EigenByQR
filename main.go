@@ -12,15 +12,20 @@ func main() {
 		{2, 12, 1, -1},
 		{1, 3, -24, 2},
 		{4, -2, 1, 20}}
+
+	y := []float64{20, 13, -16, 43}
 	/*
 		_ = eigenByQR(A, 1000)
 	*/
 	/*	x := solver(Qt, R, y)
 
 		fmt.Println("x:\n", x)*/
+	/*
+		LU := lu(A)
+		fmt.Println("LU:\n", LU)*/
 
-	LU := lu(A)
-	fmt.Println("LU:\n", LU)
+	x := luSolver(A, y)
+	fmt.Println("x:", x)
 }
 
 func eigenByQR(A [][]float64, rep int) (R [][]float64) {
@@ -167,7 +172,7 @@ func householder(A [][]float64, col int) (h []float64, topVal float64) {
 	return
 }
 
-func solver(Qt [][]float64, R [][]float64, y []float64) (x []float64) {
+func qrSolver(Qt [][]float64, R [][]float64, y []float64) (x []float64) {
 
 	size := len(R)
 
@@ -196,6 +201,7 @@ func solver(Qt [][]float64, R [][]float64, y []float64) (x []float64) {
 
 }
 
+//Lの対角成分が1であるとする。
 func lu(A [][]float64) (LU [][]float64) {
 	size := len(A)
 
@@ -205,26 +211,26 @@ func lu(A [][]float64) (LU [][]float64) {
 	}
 
 	for col := 0; col <= size-1; col++ {
-		for row := 0; row <= col-1; row++ {
-			var innerprod float64
-			for i := 0; i <= row-1; i++ {
-				innerprod += LU[row][i] * LU[i][col]
-			}
-			LU[row][col] = (A[row][col] - innerprod) / LU[row][row]
-		}
-
-		for row := col; row <= size-1; row++ {
+		for row := 0; row <= col; row++ {
 			var innerprod float64
 			for i := 0; i <= row-1; i++ {
 				innerprod += LU[row][i] * LU[i][col]
 			}
 			LU[row][col] = A[row][col] - innerprod
 		}
-	}
 
+		for row := col + 1; row <= size-1; row++ {
+			var innerprod float64
+			for i := 0; i <= row-1; i++ {
+				innerprod += LU[row][i] * LU[i][col]
+			}
+			LU[row][col] = (A[row][col] - innerprod) / LU[col][col]
+		}
+	}
 	return
 }
 
+//改定必必要。Lの対角成分を1にしなければならない
 func luInverse(LU [][]float64) (LUinv [][]float64) {
 
 	size := len(LU)
@@ -234,28 +240,90 @@ func luInverse(LU [][]float64) (LUinv [][]float64) {
 		LUinv[i] = make([]float64, size)
 	}
 
+	//U
 	for col := size - 1; col >= 0; col-- {
-		for row := col - 1; row >= 0; row-- {
+		row := col
+		LUinv[col][col] = 1.0 / LU[col][col]
+		row--
+		for ; row >= 0; row-- {
 			var innerprod float64
-			for i := row + 1; i <= col-1; i++ {
+			for i := row + 1; i <= col; i++ {
 				innerprod += LU[row][i] * LUinv[i][col]
 			}
-			innerprod += LU[row][col] * 1.0
-			LUinv[row][col] = -1.0 * innerprod
+			//			innerprod += LU[row][col] * 1.0
+			LUinv[row][col] = -1.0 * innerprod / LU[row][row]
 		}
 	}
 
+	//L
 	for row := size - 1; row >= 0; row-- {
-		col := row
-		LUinv[row][row] = 1.0 / LU[row][row]
-		col--
-		for ; col >= 0; col-- {
+
+		for col := row - 1; col >= 0; col-- {
 			var innerprod float64
-			for i := col + 1; i <= row; i++ {
+			for i := col + 1; i <= row-1; i++ {
 				innerprod += LUinv[row][i] * LU[i][col]
 			}
-			LUinv[row][col] = -1.0 * innerprod / LU[col][col]
+			innerprod += 1.0 * LU[row][col]
+			LUinv[row][col] = -1.0 * innerprod
 		}
+	}
+	return
+}
+
+func inverseMatrix(A [][]float64) (AInv [][]float64) {
+	size := len(A)
+	AInv = make([][]float64, size)
+	for i := 0; i <= size-1; i++ {
+		AInv[i] = make([]float64, size)
+	}
+	LU := lu(A)
+	LUinv := luInverse(LU)
+
+	//UL
+	for row := 0; row <= size-1; row++ {
+		//colが小さい時（長い列ベクトルでUが制限因子になっている時）
+		for col := 0; col <= row-1; col++ {
+			var innerprod float64
+			for i := row; i <= size-1; i++ {
+				innerprod += LUinv[row][i] * LUinv[i][col]
+			}
+			AInv[row][col] = innerprod
+		}
+
+		for col := row; col <= size-1; col++ {
+			var innerprod float64
+			innerprod = LUinv[row][col] * 1.0
+			for i := col + 1; i <= size-1; i++ {
+				innerprod += LUinv[row][i] * LUinv[i][col]
+			}
+			AInv[row][col] = innerprod
+		}
+	}
+
+	return
+}
+
+func luSolver(A [][]float64, y []float64) (x []float64) {
+	size := len(A)
+	x = make([]float64, size)
+	interm := make([]float64, size)
+
+	LU := lu(A)
+	//L*interm = y, interm = Ux
+	for i := 0; i <= size-1; i++ {
+		var innerprod float64
+		for j := 0; j <= i-1; j++ {
+			innerprod += LU[i][j] * interm[j]
+		}
+		interm[i] = y[i] - innerprod
+	}
+	//Ux = interm
+	for i := size - 1; i >= 0; i-- {
+		var innerprod float64
+		for j := size - 1; j >= i+1; j-- {
+			innerprod += LU[i][j] * x[j]
+		}
+		x[i] = (interm[i] - innerprod) / LU[i][i]
 	}
 	return
 }
