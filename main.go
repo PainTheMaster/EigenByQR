@@ -13,22 +13,153 @@ func main() {
 		{1, 3, -24, 2},
 		{4, -2, 1, 20}}
 
-	y := []float64{20, 13, -16, 43}
-	/*
-		_ = eigenByQR(A, 1000)
-	*/
-	/*	x := solver(Qt, R, y)
+	eigenVec := eingenVecByQR(A, 1000)
 
-		fmt.Println("x:\n", x)*/
-	/*
-		LU := lu(A)
-		fmt.Println("LU:\n", LU)*/
+	fmt.Println("eigenVec:\n", eigenVec)
 
-	x := luSolver(A, y)
-	fmt.Println("x:", x)
 }
 
-func eigenByQR(A [][]float64, rep int) (R [][]float64) {
+func eingenVecByQR(A [][]float64, rep int) (eigenVec [][]float64) {
+	//サイズを求める。
+	size := len(A)
+
+	eigenVec = make([][]float64, size)
+	for i := range eigenVec {
+		eigenVec[i] = make([]float64, size)
+	}
+
+	//固有値を求めて、ベクトルに保持しておく。
+	RQ := eigenValByQR(A, rep)
+	eigenVal := make([]float64, size)
+	for i := 0; i <= size-1; i++ {
+		eigenVal[i] = RQ[i][i]
+	}
+
+	B := make([][]float64, size)
+	for i := 0; i <= size-1; i++ {
+		B[i] = make([]float64, size)
+		for j := 0; j <= size-1; j++ {
+			B[i][j] = A[i][j]
+		}
+	}
+
+	//固有値シフトのデルタを求める。
+	deltaNeg, deltaPos := lambdaDelta(eigenVal)
+
+	for i := 0; i <= size-1; i++ {
+		var shift float64
+		if eigenVal[i] >= 0 {
+			shift = eigenVal[i] + deltaPos
+		} else {
+			shift = eigenVal[i] - deltaNeg
+		}
+
+		for j := 0; j <= size-1; j++ {
+			B[j][j] = A[j][j] - shift
+		}
+
+		//正は(固有値+デルタ)を引く。負は(固有値-デルタ)を引く。なお、デルタはいずれの場合も正
+		//固有値シフトした行列の逆行列をLU法で求める。
+
+		invB := inverseMatrix(B)
+		//逆行列から反復法で固有ベクトルを求める。
+
+		for j := range eigenVec[i] {
+			eigenVec[i][j] = 1.0
+		}
+
+		for round := 0; round <= rep; round++ {
+			var innerProd, norm float64
+			tempVec := make([]float64, size)
+
+			norm = 0.0
+			for row := 0; row <= size-1; row++ {
+				innerProd = 0.0
+				for k := 0; k <= size-1; k++ {
+					innerProd += invB[row][k] * eigenVec[i][k]
+				}
+				tempVec[row] = innerProd
+				norm += innerProd * innerProd
+			}
+
+			scale := 1.0 / math.Sqrt(norm)
+			for k := range tempVec {
+				eigenVec[i][k] = tempVec[k] * scale
+			}
+		}
+	}
+	return
+}
+
+func lambdaDelta(v []float64) (deltaNeg, deltaPos float64) {
+
+	size := len(v)
+	var count, previous int
+	var gap float64
+
+	//Positive
+	gap = math.Abs(v[0] - v[size-1]) //ありうる最大のギャップ
+	//小さい方から大きい方にスキャンしていく
+	previous = 0
+	for i := size - 1; i >= 0; i-- {
+		if v[i] >= 0.0 && i < previous {
+			count++
+			//ギャップを計算して必要に応じて更新する。
+			temp := v[i] - v[previous]
+			if temp < gap {
+				gap = temp
+			}
+			//previousを更新する。
+			previous = i
+		} else if v[i] >= 0.0 {
+			count++
+			previous = i
+		}
+	}
+
+	if count == 0 {
+		deltaPos = -1.0
+	} else if count == 1 {
+		deltaPos = v[previous] * 0.1
+	} else {
+		deltaPos = gap / 3.0
+	}
+
+	//Negative
+
+	gap = math.Abs(v[0] - v[size-1]) //ありうる最大のギャップ
+	count = 0
+	previous = 0
+
+	for i := size - 1; i >= 0; i-- {
+		if v[i] < 0.0 && i < previous {
+			count++
+			//ギャップを計算して必要に応じて更新する。
+			temp := v[previous] - v[i]
+			if temp < gap {
+				gap = temp
+			}
+
+			//previousを更新する。
+			previous = i
+		} else if v[i] < 0.0 {
+			count++
+			previous = i
+		}
+	}
+
+	if count == 0 {
+		deltaNeg = -1.0
+	} else if count == 1 {
+		deltaNeg = v[previous] * (-0.1)
+	} else {
+		deltaNeg = gap / 3.0
+	}
+
+	return
+}
+
+func eigenValByQR(A [][]float64, rep int) (R [][]float64) {
 	size := len(A)
 
 	R = make([][]float64, size)
