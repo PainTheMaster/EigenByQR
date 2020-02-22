@@ -46,12 +46,12 @@ func eingenVecByQR(A [][]float64, rep int) (eigenVec [][]float64) {
 	//固有値シフトのデルタを求める。
 	deltaNeg, deltaPos := lambdaDelta(eigenVal)
 
-	for i := 0; i <= size-1; i++ {
+	for idxRambda := 0; idxRambda <= size-1; idxRambda++ {
 		var shift float64
-		if eigenVal[i] >= 0 {
-			shift = eigenVal[i] + deltaPos
+		if eigenVal[idxRambda] >= 0 {
+			shift = eigenVal[idxRambda] + deltaPos
 		} else {
-			shift = eigenVal[i] - deltaNeg
+			shift = eigenVal[idxRambda] - deltaNeg
 		}
 
 		for j := 0; j <= size-1; j++ {
@@ -61,30 +61,23 @@ func eingenVecByQR(A [][]float64, rep int) (eigenVec [][]float64) {
 		//正は(固有値+デルタ)を引く。負は(固有値-デルタ)を引く。なお、デルタはいずれの場合も正
 		//固有値シフトした行列の逆行列をLU法で求める。
 
-		invB := inverseMatrix(B)
-		//逆行列から反復法で固有ベクトルを求める。
-
-		for j := range eigenVec[i] {
-			eigenVec[i][j] = 1.0
+		for j := range eigenVec[idxRambda] {
+			eigenVec[idxRambda][j] = 1.0
 		}
 
-		for round := 0; round <= rep; round++ {
-			var innerProd, norm float64
-			tempVec := make([]float64, size)
+		for round := 0; round <= rep-1; round++ {
+			var norm float64
+
+			eigenVec[idxRambda] = luSolver(B, eigenVec[idxRambda])
 
 			norm = 0.0
-			for row := 0; row <= size-1; row++ {
-				innerProd = 0.0
-				for k := 0; k <= size-1; k++ {
-					innerProd += invB[row][k] * eigenVec[i][k]
-				}
-				tempVec[row] = innerProd
-				norm += innerProd * innerProd
+			for k := 0; k <= size-1; k++ {
+				norm += eigenVec[idxRambda][k] * eigenVec[idxRambda][k]
 			}
 
 			scale := 1.0 / math.Sqrt(norm)
-			for k := range tempVec {
-				eigenVec[i][k] = tempVec[k] * scale
+			for k := range eigenVec[idxRambda] {
+				eigenVec[idxRambda][k] = eigenVec[idxRambda][k] * scale
 			}
 		}
 	}
