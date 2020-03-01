@@ -205,6 +205,7 @@ func helperMultiplyEigenHorizon(R [][]float64, row int, vt []float64) {
 	}
 }
 
+//qr performs QR decomposition of A and returns corresponding Householder "vectors" and a matrix R
 func qr(A [][]float64) (Qt [][]float64, R [][]float64) {
 
 	size := len(A)
@@ -222,7 +223,7 @@ func qr(A [][]float64) (Qt [][]float64, R [][]float64) {
 	}
 
 	for colPiv := 0; colPiv <= size-2; colPiv++ {
-		tempH, topVal := householder(R, colPiv)
+		tempH, topVal := householder(R, colPiv, colPiv)
 
 		Qt[colPiv] = make([]float64, size-colPiv)
 		for row := 0; row <= size-colPiv-1; row++ {
@@ -261,35 +262,36 @@ func helperMultiplyQrVertical(R [][]float64, col int, v []float64) {
 }
 
 //Gives Householder "vector" of A focusing on the column c "col" and topVal
-func householder(A [][]float64, col int) (h []float64, topVal float64) {
+//processes the column "col" row "row" to size-1.
+func householder(A [][]float64, col int, row int) (h []float64, topVal float64) {
 	size := len(A)
 
 	topVal = 0.0
-	for i := col; i <= size-1; i++ {
+	for i := row; i <= size-1; i++ {
 		topVal += A[i][col] * A[i][col]
 	}
 
 	tempSqNormH := topVal
 
 	topVal = math.Sqrt(topVal)
-	if A[col][col] > 0 {
+	if A[row][col] > 0 {
 		topVal *= -1.0
 	}
 
-	h = make([]float64, size-col)
+	h = make([]float64, size-row)
 
-	h[0] = A[col][col] - topVal
+	h[0] = A[row][col] - topVal
 
-	for i := 1; i <= size-col-1; i++ {
-		h[i] = A[col+i][col]
+	for i := 1; i <= size-row-1; i++ {
+		h[i] = A[row+i][col]
 	}
 
-	tempSqNormH -= A[col][col] * A[col][col]
+	tempSqNormH -= A[row][col] * A[row][col]
 	tempSqNormH += h[0] * h[0]
 
 	normalizFactor := 1.0 / math.Sqrt(tempSqNormH)
 
-	for i := 0; i <= size-col-1; i++ {
+	for i := 0; i <= size-row-1; i++ {
 		h[i] *= normalizFactor
 	}
 
