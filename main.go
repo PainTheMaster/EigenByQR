@@ -8,14 +8,19 @@ import (
 func main() {
 
 	A := [][]float64{
-		{16, -1, 1, 2},
-		{2, 12, 1, -1},
-		{1, 3, -24, 2},
-		{4, -2, 1, 20}}
+		{1, 20, 5, 8},
+		{20, 1, -2, 15},
+		{5, -2, 1, 3},
+		{8, 15, 3, 1}}
 
-	eigenVec := eingenVecByQR(A, 1000)
+	QReigen := eigenValByQR(A, 100)
+	fmt.Println("QR eigen:")
+	fmt.Print(QReigen)
+	fmt.Println()
 
-	fmt.Println("eigenVec:\n", eigenVec)
+	GivensEigen := eigenSymmByGivens(A, 100)
+	fmt.Println("Symm givens eigen:")
+	fmt.Print(GivensEigen)
 
 }
 
@@ -163,32 +168,27 @@ func eigenValByQR(A [][]float64, rep int) (R [][]float64) {
 		}
 	}
 
-	fmt.Println("A:\n", A)
-	fmt.Println("R:\n", R)
-
 	var Qt [][]float64
 
 	for i := 1; i <= rep; i++ {
 		/*まずQt,Rを求める*/
-		fmt.Println("pre-qr R:\n", R)
-
 		Qt, R = qr(R) /*宣言同時代入(:=)してはいけない。そうしてしまう右辺と左辺のRが別々のシンボルとなり、毎回Rの初期値から初めてしまうようだ!*/
 
 		/* Qを順に掛けていく */
 		lenQt := len(Qt)
 		for idxQt := 0; idxQt <= lenQt-1; idxQt++ {
 			for row := 0; row <= size-1; row++ {
-				helperMultiplyEigenHorizon(R, row, Qt[idxQt])
+				helperMultiplyQrHorizon(R, row, Qt[idxQt])
 			}
 		}
 
-		fmt.Println(i, ", R:\n", R)
 	}
 
 	return
 }
 
-func helperMultiplyEigenHorizon(R [][]float64, row int, vt []float64) {
+//helperMultiplyQrhorizon multiplies a vector to a matrix from right in a Householder manner
+func helperMultiplyQrHorizon(R [][]float64, row int, vt []float64) {
 
 	sizeMat := len(R)
 	sizeVec := len(vt)
@@ -244,6 +244,7 @@ func qr(A [][]float64) (Qt [][]float64, R [][]float64) {
 	return
 }
 
+//helperMultiplyQrVertical multiplies a vector to a matrix from the right in a Householder manner
 func helperMultiplyQrVertical(R [][]float64, col int, v []float64) {
 	sizeMat := len(R)
 	sizeVec := len(v)
@@ -261,8 +262,8 @@ func helperMultiplyQrVertical(R [][]float64, col int, v []float64) {
 	}
 }
 
-//Gives Householder "vector" of A focusing on the column c "col" and topVal
-//processes the column "col" row "row" to size-1.
+//Gives Householder "vector" of A focusing on the column c "col" and topVal. topVal is the 1st element of the transformed vector and corresponds to the norm of the original vector
+//processes the column "col", from row "row" to size-1.
 func householder(A [][]float64, col int, row int) (h []float64, topVal float64) {
 	size := len(A)
 
@@ -451,5 +452,107 @@ func luSolver(A [][]float64, y []float64) (x []float64) {
 		}
 		x[i] = (interm[i] - innerprod) / LU[i][i]
 	}
+	return
+}
+
+//tripDiagHouseholder transforms a square matrix A into a triple diagonal matix TripDiag
+//this function also returns the "Householder vectors"
+func tripDiagHouseholder(A [][]float64) (householderVec [][]float64, TripDiag [][]float64) {
+	size := len(A)
+
+	tempMat := make([][]float64, size)
+	for i := 0; i <= size-1; i++ {
+		tempMat[i] = make([]float64, size)
+		for j := 0; j <= size-1; j++ {
+			tempMat[i][j] = A[i][j]
+		}
+	}
+
+	householderVec = make([][]float64, size-2)
+	for i := 0; i <= size-3; i++ {
+		householderVec[i] = make([]float64, size-1-i)
+	}
+
+	TripDiag = make([][]float64, 2)
+	TripDiag[0] = make([]float64, size)
+	TripDiag[1] = make([]float64, size-1)
+
+	for piv := 0; piv <= size-3; piv++ {
+		TripDiag[0][piv] = tempMat[piv][piv]
+		householderVec[piv], TripDiag[1][piv] = householder(tempMat, piv, piv+1)
+		tempMat[piv+1][piv] = TripDiag[1][piv]
+		for row := piv + 2; row <= size-1; row++ {
+			tempMat[row][piv] = 0.0
+		}
+		for colMulti := piv + 1; colMulti <= size-1; colMulti++ {
+			helperMultiplyQrVertical(tempMat, colMulti, householderVec[piv])
+		}
+
+		tempMat[piv][piv+1] = TripDiag[1][piv]
+		for col := piv + 2; col <= size-1; col++ {
+			tempMat[piv][col] = 0.0
+		}
+		for colMulti := piv + 1; colMulti <= size-1; colMulti++ {
+			helperMultiplyQrHorizon(tempMat, colMulti, householderVec[piv])
+		}
+	}
+
+	TripDiag[0][size-2] = tempMat[size-2][size-2]
+	TripDiag[1][size-2] = tempMat[size-1][size-2]
+
+	TripDiag[0][size-1] = tempMat[size-1][size-1]
+
+	return
+}
+
+func eigenSymmByGivens(A [][]float64, rep int) (eigenVal []float64) {
+	size := len(A)
+	_, TripDiag := tripDiagHouseholder(A)
+
+	cos := make([]float64, size-1)
+	sin := make([]float64, size-1)
+
+	for cycle := 0; cycle <= rep-1; cycle++ {
+		{
+			piv := 0
+			norm := TripDiag[0][piv]*TripDiag[0][piv] + TripDiag[1][piv]*TripDiag[1][piv]
+			norm = math.Sqrt(norm)
+			cos[piv] = TripDiag[0][piv] / norm
+			sin[piv] = TripDiag[1][piv] / norm
+
+			TripDiag[0][piv] = norm
+
+			temp := cos[piv]*TripDiag[1][piv] + sin[piv]*TripDiag[0][piv+1]
+			TripDiag[0][piv+1] = -sin[piv]*TripDiag[1][piv] + cos[piv]*TripDiag[0][piv+1]
+			TripDiag[1][piv] = temp
+		}
+
+		for piv := 1; piv <= size-2; piv++ {
+			norm := TripDiag[0][piv]*TripDiag[0][piv] + TripDiag[1][piv]*TripDiag[1][piv]
+			norm = math.Sqrt(norm)
+			cos[piv] = TripDiag[0][piv] / norm
+			sin[piv] = TripDiag[1][piv] / norm
+
+			TripDiag[0][piv] = norm
+
+			TripDiag[1][piv] *= cos[piv-1]
+
+			temp := cos[piv]*TripDiag[1][piv] + sin[piv]*TripDiag[0][piv+1]
+			TripDiag[0][piv+1] = -sin[piv]*TripDiag[1][piv] + cos[piv]*TripDiag[0][piv+1]
+			TripDiag[1][piv] = temp
+		}
+
+		for piv := 0; piv <= size-2; piv++ {
+			TripDiag[0][piv] = cos[piv]*TripDiag[0][piv] + sin[piv]*TripDiag[1][piv]
+			TripDiag[1][piv] = sin[piv] * TripDiag[0][piv+1]
+			TripDiag[0][piv+1] = cos[piv] * TripDiag[0][piv+1]
+		}
+	}
+
+	eigenVal = make([]float64, size)
+	for piv := 0; piv <= size-1; piv++ {
+		eigenVal[piv] = TripDiag[0][piv]
+	}
+
 	return
 }
