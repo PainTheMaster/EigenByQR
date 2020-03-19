@@ -1,7 +1,7 @@
 package main
 
 import (
-	"PainTheMaster/Eigen/eigen"
+	matrix "PainTheMaster/mybraly/math/matrix"
 	"fmt"
 )
 
@@ -13,12 +13,12 @@ func main() {
 		{5, -2, 1, 3},
 		{8, 15, 3, 1}}
 
-	QReigen := eigen.EigenValByQR(A, 100)
+	QReigen := matrix.EigenValByQR(A, 100)
 	fmt.Println("QR eigen:")
 	fmt.Print(QReigen)
 	fmt.Println()
 
-	GivensEigen := eigen.EigenValSymmByGivens(A, 100)
+	GivensEigen := matrix.EigenValSymmByGivens(A, 100)
 	fmt.Println("Symm givens eigen:")
 	fmt.Print(GivensEigen)
 
